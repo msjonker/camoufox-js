@@ -36,6 +36,8 @@ import { sampleWebGL } from "./webgl/sample.js";
 
 type Screen = FingerprintGeneratorOptions["screen"];
 
+type VirtualDisplayLike = Pick<VirtualDisplay, "kill">;
+
 // Camoufox preferences to cache previous pages and requests
 const CACHE_PREFS = {
 	"browser.sessionhistory.max_entries": 10,
@@ -310,7 +312,7 @@ function warnManualConfig(config: Record<string, any>): void {
 
 async function _asyncAttachVD(
 	browser: any,
-	virtualDisplay?: VirtualDisplay,
+	virtualDisplay?: VirtualDisplayLike,
 ): Promise<any> {
 	if (!virtualDisplay) {
 		return browser;
@@ -332,7 +334,7 @@ async function _asyncAttachVD(
 
 export function syncAttachVD(
 	browser: any,
-	virtualDisplay?: VirtualDisplay | null,
+	virtualDisplay?: VirtualDisplayLike | null,
 ): any {
 	/**
 	 * Attaches the virtual display to the sync browser cleanup
@@ -454,6 +456,12 @@ export interface LaunchOptions {
 	/** Virtual display number. Example: `":99"`. This is handled by Camoufox & AsyncCamoufox. */
 	virtual_display?: string;
 
+	/** Wayland virtual display socket name. Example: `"wayland-1"`. */
+	wayland_display?: string;
+
+	/** XDG runtime dir to use with Wayland. Required when using `wayland_display` for isolated compositor sockets. */
+	xdg_runtime_dir?: string;
+
 	/** Use a specific WebGL vendor/renderer pair. Passed as a tuple of `[vendor, renderer]`. */
 	webgl_config?: [string, string];
 
@@ -523,6 +531,8 @@ export async function launchOptions({
 	i_know_what_im_doing,
 	debug,
 	virtual_display,
+	wayland_display,
+	xdg_runtime_dir,
 	...launch_options
 }: LaunchOptions): Promise<Record<string, any>> {
 	// Build the config
@@ -560,6 +570,20 @@ export async function launchOptions({
 	// Handle virtual display
 	if (virtual_display) {
 		env.DISPLAY = virtual_display;
+	}
+	if (wayland_display) {
+		env.WAYLAND_DISPLAY = wayland_display;
+		if (xdg_runtime_dir) {
+			env.XDG_RUNTIME_DIR = xdg_runtime_dir;
+		}
+		// Ensure Firefox actually uses the Wayland backend when WAYLAND_DISPLAY is set.
+		// Without this, Firefox may fall back to X11 and hang waiting for DISPLAY.
+		if (!("MOZ_ENABLE_WAYLAND" in env)) {
+			env.MOZ_ENABLE_WAYLAND = "1";
+		}
+		if (!("GDK_BACKEND" in env)) {
+			env.GDK_BACKEND = "wayland";
+		}
 	}
 
 	// Warn the user for manual config settings

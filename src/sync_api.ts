@@ -6,7 +6,18 @@ import {
 } from "playwright-core";
 
 import { type LaunchOptions, launchOptions, syncAttachVD } from "./utils.js";
-import { VirtualDisplay } from "./virtdisplay.js";
+import { VirtualDisplay, WaylandVirtualDisplay } from "./virtdisplay.js";
+
+function isWaylandSession(): boolean {
+	if (process.env.XDG_SESSION_TYPE === "wayland") {
+		return true;
+	}
+	if (process.env.XDG_SESSION_TYPE === "x11") {
+		return false;
+	}
+	// Fallback: if WAYLAND_DISPLAY is set, assume Wayland
+	return !!process.env.WAYLAND_DISPLAY;
+}
 
 export async function Camoufox<
 	UserDataDir extends string | undefined = undefined,
@@ -38,11 +49,20 @@ export async function NewBrowser<
 	debug: boolean = false,
 	launch_options: LaunchOptions = {},
 ): Promise<ReturnType> {
-	let virtualDisplay: VirtualDisplay | null = null;
+	let displayHandle: { kill(): void } | null = null;
 
 	if (headless === "virtual") {
-		virtualDisplay = new VirtualDisplay(debug);
-		launch_options.virtual_display = virtualDisplay.get();
+		const useWayland = isWaylandSession();
+		if (useWayland) {
+			const waylandVirtualDisplay = new WaylandVirtualDisplay(debug);
+			launch_options.wayland_display = waylandVirtualDisplay.get();
+			launch_options.xdg_runtime_dir = waylandVirtualDisplay.runtimeDir;
+			displayHandle = waylandVirtualDisplay;
+		} else {
+			const virtualDisplay = new VirtualDisplay(debug);
+			launch_options.virtual_display = virtualDisplay.get();
+			displayHandle = virtualDisplay;
+		}
 		launch_options.headless = false;
 	} else {
 		launch_options.headless ||= headless;
@@ -57,9 +77,9 @@ export async function NewBrowser<
 			userDataDir,
 			fromOptions,
 		);
-		return syncAttachVD(context, virtualDisplay);
+		return syncAttachVD(context, displayHandle);
 	}
 
 	const browser = await playwright.launch(fromOptions);
-	return syncAttachVD(browser, virtualDisplay);
+	return syncAttachVD(browser, displayHandle);
 }
