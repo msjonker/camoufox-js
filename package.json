@@ -7,7 +7,8 @@
 		"build": "rimraf dist && tsc && npm run copy-files",
 		"test": "vitest",
 		"copy-files": "cp -r src/data-files dist/data-files",
-		"check": "biome check"
+		"check": "biome check",
+		"prepare": "npm run build"
 	},
 	"bin": "dist/__main__.js",
 	"files": [
