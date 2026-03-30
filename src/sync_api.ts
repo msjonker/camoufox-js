@@ -6,7 +6,7 @@ import {
 } from "playwright-core";
 
 import { type LaunchOptions, launchOptions, syncAttachVD } from "./utils.js";
-import { VirtualDisplay, WaylandVirtualDisplay } from "./virtdisplay.js";
+import { VirtualDisplay } from "./virtdisplay.js";
 
 function isWaylandSession(): boolean {
 	if (process.env.XDG_SESSION_TYPE === "wayland") {
@@ -52,17 +52,19 @@ export async function NewBrowser<
 	let displayHandle: { kill(): void } | null = null;
 
 	if (headless === "virtual") {
-		const useWayland = isWaylandSession();
-		if (useWayland) {
-			const waylandVirtualDisplay = new WaylandVirtualDisplay(debug);
-			launch_options.wayland_display = waylandVirtualDisplay.get();
-			launch_options.xdg_runtime_dir = waylandVirtualDisplay.runtimeDir;
-			displayHandle = waylandVirtualDisplay;
-		} else {
-			const virtualDisplay = new VirtualDisplay(debug);
-			launch_options.virtual_display = virtualDisplay.get();
-			displayHandle = virtualDisplay;
-		}
+		const screenWidth = launch_options.screen?.maxWidth ?? 1920;
+		const screenHeight = launch_options.screen?.maxHeight ?? 1080;
+
+		// Always use Xvfb (X11) for virtual mode — it is proven undetectable.
+		// Weston/Wayland leaks detectable signals (GDK_BACKEND, Wayland-specific APIs).
+		const virtualDisplay = new VirtualDisplay(debug, screenWidth, screenHeight);
+		launch_options.virtual_display = virtualDisplay.get();
+		launch_options.screen = {
+			...launch_options.screen,
+			maxWidth: virtualDisplay.width,
+			maxHeight: virtualDisplay.height,
+		};
+		displayHandle = virtualDisplay;
 		launch_options.headless = false;
 	} else {
 		launch_options.headless ||= headless;

@@ -567,23 +567,28 @@ export async function launchOptions({
 		executable_path = path.resolve(executable_path);
 	}
 
-	// Handle virtual display
+	// Collect display-related env overrides (applied later to env_vars, not process.env)
+	const displayEnvOverrides: Record<string, string | undefined> = {};
+
+	// Handle virtual display (Xvfb)
 	if (virtual_display) {
-		env.DISPLAY = virtual_display;
+		displayEnvOverrides.DISPLAY = virtual_display;
+		// Strip Wayland env vars so Firefox uses X11 (Xvfb) exclusively,
+		// even when the host session is Wayland.
+		displayEnvOverrides.WAYLAND_DISPLAY = undefined;
+		displayEnvOverrides.MOZ_ENABLE_WAYLAND = undefined;
+		displayEnvOverrides.GDK_BACKEND = "x11";
 	}
 	if (wayland_display) {
-		env.WAYLAND_DISPLAY = wayland_display;
+		displayEnvOverrides.WAYLAND_DISPLAY = wayland_display;
 		if (xdg_runtime_dir) {
-			env.XDG_RUNTIME_DIR = xdg_runtime_dir;
+			displayEnvOverrides.XDG_RUNTIME_DIR = xdg_runtime_dir;
 		}
-		// Ensure Firefox actually uses the Wayland backend when WAYLAND_DISPLAY is set.
-		// Without this, Firefox may fall back to X11 and hang waiting for DISPLAY.
-		if (!("MOZ_ENABLE_WAYLAND" in env)) {
-			env.MOZ_ENABLE_WAYLAND = "1";
-		}
-		if (!("GDK_BACKEND" in env)) {
-			env.GDK_BACKEND = "wayland";
-		}
+		// Force Firefox to use Wayland only — remove DISPLAY to prevent
+		// fallback to XWayland which would show the window on the host screen.
+		displayEnvOverrides.DISPLAY = undefined;
+		displayEnvOverrides.MOZ_ENABLE_WAYLAND = "1";
+		displayEnvOverrides.GDK_BACKEND = "wayland";
 	}
 
 	// Warn the user for manual config settings
@@ -774,10 +779,17 @@ export async function launchOptions({
 	validateConfig(config, executable_path);
 
 	//Prepare environment variables to pass to Camoufox
-	const env_vars = {
+	const env_vars: Record<string, string | number | boolean | undefined> = {
 		...getEnvVars(config, targetOS),
 		...process.env,
+		...displayEnvOverrides,
 	};
+	// Remove keys explicitly set to undefined (e.g. DISPLAY when using Wayland)
+	for (const key of Object.keys(env_vars)) {
+		if (env_vars[key] === undefined) {
+			delete env_vars[key];
+		}
+	}
 
 	// Prepare the executable path
 	if (executable_path) {

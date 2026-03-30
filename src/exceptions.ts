@@ -158,20 +158,6 @@ export class CannotExecuteXvfb extends VirtualDisplayError {
 	}
 }
 
-export class CannotFindWeston extends VirtualDisplayError {
-	constructor(message?: string) {
-		super(message ?? "Weston cannot be found.");
-		this.name = "CannotFindWeston";
-	}
-}
-
-export class CannotExecuteWeston extends VirtualDisplayError {
-	constructor(message?: string) {
-		super(message ?? "Weston cannot be executed.");
-		this.name = "CannotExecuteWeston";
-	}
-}
-
 export class VirtualDisplayNotSupported extends VirtualDisplayError {
 	constructor(message?: string) {
 		super(

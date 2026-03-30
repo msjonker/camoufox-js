@@ -63,6 +63,35 @@ await browser.close();
 await server.close(); // Close the server when done
 ```
 
+## Virtual Display (Headless Mode)
+
+When using `headless: "virtual"`, Camoufox runs inside a virtual X11 display using [Xvfb](https://www.x.org/releases/X11R7.6/doc/man/man1/Xvfb.1.xhtml). This is required even on Wayland-based systems.
+
+### Prerequisites
+
+Install Xvfb if it is not already available:
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install -y xvfb
+
+# Fedora
+sudo dnf install -y xorg-x11-server-Xvfb
+
+# Arch
+sudo pacman -S xorg-server-xvfb
+```
+
+> **Note for Wayland-only environments:** Camoufox intentionally uses Xvfb (X11) instead of a Wayland compositor for virtual display mode, as this avoids detection by bot-protection services. Xvfb does not require a running X11 desktop session — it creates a standalone virtual X server.
+
+### Usage
+
+```javascript
+const browser = await Camoufox({
+    headless: "virtual",
+});
+```
+
 ## More info
 
 See https://camoufox.com/ or https://github.com/daijro/camoufox for more information on Camoufox.
