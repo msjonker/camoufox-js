@@ -14,6 +14,7 @@ import { OS_NAME } from "./pkgman.js";
 export class VirtualDisplay {
 	private debug: boolean;
 	private proc: ChildProcess | null = null;
+	private _pid: number | null = null;
 	private _display: number | null = null;
 	private _width: number;
 	private _height: number;
@@ -84,8 +85,11 @@ export class VirtualDisplay {
 		}
 		this.proc = spawn(this.xvfb_cmd[0], this.xvfb_cmd.slice(1), {
 			stdio: this.debug ? "inherit" : "ignore",
-			detached: true,
 		});
+		// Store PID immediately since proc.pid can become undefined
+		if (this.proc.pid) {
+			this._pid = this.proc.pid;
+		}
 	}
 
 	public get(): string {
@@ -104,11 +108,17 @@ export class VirtualDisplay {
 
 	public kill(): void {
 		// this._lock.runExclusive(() => {
-		if (this.proc && !this.proc.killed) {
+		if (this._pid) {
 			if (this.debug) {
-				console.log("Terminating virtual display:", this.display);
+				console.log("Terminating virtual display:", this._display, "pid:", this._pid);
 			}
-			this.proc.kill();
+			try {
+				process.kill(this._pid, "SIGKILL");
+			} catch {
+				// Process already dead
+			}
+			this._pid = null;
+			this.proc = null;
 		}
 		// });
 	}
